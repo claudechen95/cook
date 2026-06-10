@@ -354,22 +354,34 @@ function RecipesScreen() {
         <h2 className="text-xl font-bold">My Recipes</h2>
       </div>
       <ul className="divide-y divide-gray-100 px-4">
-        {recipes.map((r) => (
-          <li key={r.id}>
-            <button
-              onClick={() => setViewing(r)}
-              className="w-full flex items-center justify-between py-4 text-left gap-3"
-            >
-              <div className="min-w-0">
-                <p className="text-sm font-medium truncate">{r.title}</p>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  {r.ingredients.length} ingredients · {r.steps.length} steps · {r.savedAt}
-                </p>
-              </div>
-              <span className="text-gray-300 shrink-0">›</span>
-            </button>
-          </li>
-        ))}
+        {recipes.map((r) => {
+          const thumb = r.stepFrames?.[0];
+          return (
+            <li key={r.id}>
+              <button
+                onClick={() => setViewing(r)}
+                className="w-full flex items-center gap-3 py-3 text-left"
+              >
+                {thumb ? (
+                  <img
+                    src={`data:image/jpeg;base64,${thumb}`}
+                    alt=""
+                    className="w-16 h-16 rounded-xl object-cover shrink-0"
+                  />
+                ) : (
+                  <div className="w-16 h-16 rounded-xl bg-gray-100 shrink-0" />
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium leading-snug">{r.title}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {r.ingredients.length} ingredients · {r.steps.length} steps · {r.savedAt}
+                  </p>
+                </div>
+                <span className="text-gray-300 shrink-0">›</span>
+              </button>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
