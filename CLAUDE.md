@@ -10,14 +10,17 @@ Instagram video → recipe converter. Next.js 16 app router, deployed on Vercel.
 - **Deployment:** Vercel (`npm run deploy`)
 
 ## Architecture
-- `app/page.tsx` — client UI: URL input → frame extraction → recipe display + save
-- `app/api/fetch-video` — POST: scrapes Instagram embed page for direct video CDN URL
-- `app/api/proxy-video` — GET: streams Instagram CDN video to browser (CORS workaround)
+- `app/page.tsx` — client UI: URL input → video download → frame extraction → recipe display + save
+- `app/api/download-video` — POST: runs yt-dlp, streams full mp4 back to browser
 - `app/api/extract-recipe` — POST: sends frames to Claude vision, returns recipe JSON
 - `app/api/recipes` — GET list / POST save
 - `app/api/recipes/[id]` — DELETE
 - `lib/kv.ts` — Upstash Redis helpers
 - `lib/types.ts` — `Recipe`, `Ingredient` interfaces
+
+## Notes
+- Requires `yt-dlp` installed locally (`brew install yt-dlp`)
+- Local-only (yt-dlp can't run on Vercel serverless)
 
 ## Required env vars (.env.local)
 ```

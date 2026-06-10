@@ -3,6 +3,20 @@
 import { useState, useEffect } from "react";
 import type { Recipe } from "@/lib/types";
 
+async function downloadVideo(igUrl: string): Promise<string> {
+  const res = await fetch("/api/download-video", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url: igUrl }),
+  });
+  if (!res.ok) {
+    const data = await res.json();
+    throw new Error(data.error ?? "Failed to download video");
+  }
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
+}
+
 async function extractFrames(videoSrc: string, count = 8): Promise<string[]> {
   return new Promise((resolve, reject) => {
     const video = document.createElement("video");
@@ -52,8 +66,8 @@ type Phase = "idle" | "fetching" | "extracting" | "analyzing" | "done" | "error"
 
 const PHASE_MESSAGES: Record<Phase, string> = {
   idle: "",
-  fetching: "Fetching video from Instagram...",
-  extracting: "Extracting frames from video...",
+  fetching: "",
+  extracting: "Downloading & extracting frames...",
   analyzing: "Analyzing recipe with Claude...",
   done: "",
   error: "",
@@ -84,17 +98,10 @@ export default function Home() {
     setSaved(false);
 
     try {
-      const videoRes = await fetch("/api/fetch-video", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
-      });
-      const videoData = await videoRes.json();
-      if (!videoRes.ok) throw new Error(videoData.error ?? "Failed to fetch video");
-
       setPhase("extracting");
-      const proxyUrl = `/api/proxy-video?url=${encodeURIComponent(videoData.videoUrl)}`;
-      const frames = await extractFrames(proxyUrl);
+      const blobUrl = await downloadVideo(url);
+      const frames = await extractFrames(blobUrl);
+      URL.revokeObjectURL(blobUrl);
 
       setPhase("analyzing");
       const recipeRes = await fetch("/api/extract-recipe", {
