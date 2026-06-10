@@ -10,6 +10,7 @@ export interface Recipe {
   igUrl: string;
   ingredients: Ingredient[];
   steps: string[];
+  stepFrames?: string[]; // base64 JPEG per step, aligned by index
   notes?: string;
   savedAt: string;
 }

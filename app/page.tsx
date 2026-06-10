@@ -1,7 +1,17 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { Recipe } from "@/lib/types";
+import type { Recipe, Ingredient } from "@/lib/types";
+
+async function getVideoInfo(igUrl: string): Promise<{ title: string; description: string }> {
+  const res = await fetch("/api/video-info", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url: igUrl }),
+  });
+  if (!res.ok) return { title: "", description: "" };
+  return res.json();
+}
 
 async function downloadVideo(igUrl: string): Promise<string> {
   const res = await fetch("/api/download-video", {
@@ -34,9 +44,8 @@ async function extractFrames(videoSrc: string, count = 8): Promise<string[]> {
     };
 
     video.addEventListener("error", () =>
-      reject(new Error("Video failed to load. The proxy may have been blocked."))
+      reject(new Error("Video failed to load."))
     );
-
     video.addEventListener("loadedmetadata", () => {
       if (!video.duration || !isFinite(video.duration)) {
         reject(new Error("Could not determine video duration."));
@@ -46,28 +55,100 @@ async function extractFrames(videoSrc: string, count = 8): Promise<string[]> {
       canvas.height = Math.round((canvas.width * video.videoHeight) / video.videoWidth);
       seekNext();
     });
-
     video.addEventListener("seeked", () => {
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       frames.push(canvas.toDataURL("image/jpeg", 0.7).split(",")[1]);
       frameIdx++;
-      if (frameIdx >= count) {
-        resolve(frames);
-      } else {
-        seekNext();
-      }
+      if (frameIdx >= count) resolve(frames);
+      else seekNext();
     });
 
     video.src = videoSrc;
   });
 }
 
+// ── Shared recipe body (ingredients + visual steps) ──────────────────────────
+
+function IngredientList({ ingredients }: { ingredients: Ingredient[] }) {
+  return (
+    <div>
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">
+        Ingredients
+      </h3>
+      <ul className="space-y-1.5 text-sm">
+        {ingredients.map((ing, i) => (
+          <li key={i} className="flex gap-3">
+            <span className="text-gray-400 w-24 shrink-0 text-right">
+              {[ing.amount, ing.unit].filter(Boolean).join(" ") || "—"}
+            </span>
+            <span>{ing.item}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function StepList({ steps, stepFrames }: { steps: string[]; stepFrames?: string[] }) {
+  return (
+    <div>
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">
+        Instructions
+      </h3>
+      <ol className="space-y-4">
+        {steps.map((step, i) => {
+          const frame = stepFrames?.[i];
+          return (
+            <li key={i} className="flex gap-3">
+              <span className="text-gray-400 font-medium shrink-0 w-5 text-right pt-0.5 text-sm">
+                {i + 1}.
+              </span>
+              <div className="flex-1 space-y-2">
+                <p className="text-sm">{step}</p>
+                {frame && (
+                  <img
+                    src={`data:image/jpeg;base64,${frame}`}
+                    alt={`Step ${i + 1}`}
+                    className="rounded-lg w-full max-w-xs object-cover border border-gray-100"
+                  />
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
+
+function RecipeBody({ recipe }: { recipe: Recipe }) {
+  return (
+    <div className="space-y-5">
+      <IngredientList ingredients={recipe.ingredients} />
+      <StepList steps={recipe.steps} stepFrames={recipe.stepFrames} />
+      {recipe.notes && (
+        <div className="bg-gray-50 rounded-lg px-4 py-3 text-sm text-gray-600">
+          <span className="font-medium">Notes: </span>
+          {recipe.notes}
+        </div>
+      )}
+      <div className="text-xs text-gray-400 border-t pt-3">
+        <a href={recipe.igUrl} target="_blank" rel="noopener noreferrer" className="hover:underline">
+          View original
+        </a>
+      </div>
+    </div>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
+
 type Phase = "idle" | "fetching" | "extracting" | "analyzing" | "done" | "error";
 
 const PHASE_MESSAGES: Record<Phase, string> = {
   idle: "",
-  fetching: "",
-  extracting: "Downloading & extracting frames...",
+  fetching: "Fetching caption & downloading video...",
+  extracting: "Extracting frames...",
   analyzing: "Analyzing recipe with Claude...",
   done: "",
   error: "",
@@ -99,8 +180,13 @@ export default function Home() {
     setSaved(false);
 
     try {
+      // Fetch caption and download video in parallel
+      const [info, blobUrl] = await Promise.all([
+        getVideoInfo(url),
+        downloadVideo(url),
+      ]);
+
       setPhase("extracting");
-      const blobUrl = await downloadVideo(url);
       const frames = await extractFrames(blobUrl);
       URL.revokeObjectURL(blobUrl);
 
@@ -108,7 +194,7 @@ export default function Home() {
       const recipeRes = await fetch("/api/extract-recipe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ frames, igUrl: url }),
+        body: JSON.stringify({ frames, caption: info.description, igUrl: url }),
       });
       const recipeData = await recipeRes.json();
       if (!recipeRes.ok) throw new Error(recipeData.error ?? "Failed to extract recipe");
@@ -137,6 +223,7 @@ export default function Home() {
   async function handleDelete(id: string) {
     await fetch(`/api/recipes/${id}`, { method: "DELETE" });
     setRecipes((prev) => prev.filter((r) => r.id !== id));
+    if (expandedId === id) setExpandedId(null);
   }
 
   return (
@@ -195,56 +282,7 @@ export default function Home() {
               </button>
             )}
           </div>
-
-          <div>
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-400 mb-2">
-              Ingredients
-            </h3>
-            <ul className="space-y-1.5 text-sm">
-              {recipe.ingredients.map((ing, i) => (
-                <li key={i} className="flex gap-3">
-                  <span className="text-gray-400 w-24 shrink-0 text-right">
-                    {[ing.amount, ing.unit].filter(Boolean).join(" ") || "—"}
-                  </span>
-                  <span>{ing.item}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div>
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-400 mb-2">
-              Instructions
-            </h3>
-            <ol className="space-y-2 text-sm">
-              {recipe.steps.map((step, i) => (
-                <li key={i} className="flex gap-3">
-                  <span className="text-gray-400 font-medium shrink-0 w-5 text-right">
-                    {i + 1}.
-                  </span>
-                  <span>{step}</span>
-                </li>
-              ))}
-            </ol>
-          </div>
-
-          {recipe.notes && (
-            <div className="bg-gray-50 rounded-lg px-4 py-3 text-sm text-gray-600">
-              <span className="font-medium">Notes: </span>
-              {recipe.notes}
-            </div>
-          )}
-
-          <div className="text-xs text-gray-400 border-t pt-3">
-            <a
-              href={recipe.igUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:underline"
-            >
-              View original
-            </a>
-          </div>
+          <RecipeBody recipe={recipe} />
         </div>
       )}
 
@@ -263,55 +301,16 @@ export default function Home() {
                     <div>
                       <div className="text-sm font-medium">{r.title}</div>
                       <div className="text-xs text-gray-400 mt-0.5">
-                        {r.ingredients.length} ingredients &middot; {r.steps.length} steps &middot; {r.savedAt}
+                        {r.ingredients.length} ingredients · {r.steps.length} steps · {r.savedAt}
                       </div>
                     </div>
                     <span className="text-gray-400 ml-4 shrink-0 text-xs">{expanded ? "▲" : "▼"}</span>
                   </button>
 
                   {expanded && (
-                    <div className="px-4 pb-4 space-y-4 border-t border-gray-100">
-                      <div className="pt-3">
-                        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Ingredients</h3>
-                        <ul className="space-y-1.5 text-sm">
-                          {r.ingredients.map((ing, i) => (
-                            <li key={i} className="flex gap-3">
-                              <span className="text-gray-400 w-24 shrink-0 text-right">
-                                {[ing.amount, ing.unit].filter(Boolean).join(" ") || "—"}
-                              </span>
-                              <span>{ing.item}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-
-                      <div>
-                        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Instructions</h3>
-                        <ol className="space-y-2 text-sm">
-                          {r.steps.map((step, i) => (
-                            <li key={i} className="flex gap-3">
-                              <span className="text-gray-400 font-medium shrink-0 w-5 text-right">{i + 1}.</span>
-                              <span>{step}</span>
-                            </li>
-                          ))}
-                        </ol>
-                      </div>
-
-                      {r.notes && (
-                        <div className="bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-600">
-                          <span className="font-medium">Notes: </span>{r.notes}
-                        </div>
-                      )}
-
-                      <div className="flex items-center justify-between pt-1">
-                        <a
-                          href={r.igUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-gray-400 hover:underline"
-                        >
-                          View original
-                        </a>
+                    <div className="px-4 pb-5 border-t border-gray-100 pt-4">
+                      <RecipeBody recipe={r} />
+                      <div className="mt-4 flex justify-end">
                         <button
                           onClick={() => handleDelete(r.id)}
                           className="text-xs text-gray-400 hover:text-red-500"
