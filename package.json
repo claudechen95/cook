@@ -11,6 +11,8 @@
     "prepare": "git config core.hooksPath .githooks || true"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.104.1",
+    "@upstash/redis": "^1.38.0",
     "next": "^16.2.9",
     "react": "^18",
     "react-dom": "^18"
