@@ -80,6 +80,7 @@ export default function Home() {
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [saved, setSaved] = useState(false);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/recipes")
@@ -251,26 +252,78 @@ export default function Home() {
         <div>
           <h2 className="text-base font-bold mb-3">Saved Recipes</h2>
           <div className="space-y-2">
-            {recipes.map((r) => (
-              <div
-                key={r.id}
-                className="flex items-start justify-between border border-gray-200 rounded-lg px-4 py-3"
-              >
-                <div>
-                  <div className="text-sm font-medium">{r.title}</div>
-                  <div className="text-xs text-gray-400 mt-0.5">
-                    {r.ingredients.length} ingredients &middot; {r.steps.length} steps &middot;{" "}
-                    {r.savedAt}
-                  </div>
+            {recipes.map((r) => {
+              const expanded = expandedId === r.id;
+              return (
+                <div key={r.id} className="border border-gray-200 rounded-lg overflow-hidden">
+                  <button
+                    onClick={() => setExpandedId(expanded ? null : r.id)}
+                    className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+                  >
+                    <div>
+                      <div className="text-sm font-medium">{r.title}</div>
+                      <div className="text-xs text-gray-400 mt-0.5">
+                        {r.ingredients.length} ingredients &middot; {r.steps.length} steps &middot; {r.savedAt}
+                      </div>
+                    </div>
+                    <span className="text-gray-400 ml-4 shrink-0 text-xs">{expanded ? "▲" : "▼"}</span>
+                  </button>
+
+                  {expanded && (
+                    <div className="px-4 pb-4 space-y-4 border-t border-gray-100">
+                      <div className="pt-3">
+                        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Ingredients</h3>
+                        <ul className="space-y-1.5 text-sm">
+                          {r.ingredients.map((ing, i) => (
+                            <li key={i} className="flex gap-3">
+                              <span className="text-gray-400 w-24 shrink-0 text-right">
+                                {[ing.amount, ing.unit].filter(Boolean).join(" ") || "—"}
+                              </span>
+                              <span>{ing.item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      <div>
+                        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Instructions</h3>
+                        <ol className="space-y-2 text-sm">
+                          {r.steps.map((step, i) => (
+                            <li key={i} className="flex gap-3">
+                              <span className="text-gray-400 font-medium shrink-0 w-5 text-right">{i + 1}.</span>
+                              <span>{step}</span>
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+
+                      {r.notes && (
+                        <div className="bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-600">
+                          <span className="font-medium">Notes: </span>{r.notes}
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between pt-1">
+                        <a
+                          href={r.igUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-gray-400 hover:underline"
+                        >
+                          View original
+                        </a>
+                        <button
+                          onClick={() => handleDelete(r.id)}
+                          className="text-xs text-gray-400 hover:text-red-500"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <button
-                  onClick={() => handleDelete(r.id)}
-                  className="text-xs text-gray-400 hover:text-red-500 ml-4 shrink-0 pt-0.5"
-                >
-                  Delete
-                </button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
