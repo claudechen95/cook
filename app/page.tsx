@@ -297,13 +297,15 @@ function ExtractScreen() {
 
 function RecipesScreen() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [loading, setLoading] = useState(true);
   const [viewing, setViewing] = useState<Recipe | null>(null);
 
   useEffect(() => {
     fetch("/api/recipes")
       .then((r) => r.json())
       .then((d) => setRecipes(d.recipes ?? []))
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
   async function handleDelete(id: string) {
@@ -336,6 +338,27 @@ function RecipesScreen() {
           </div>
         }
       />
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="overflow-y-auto h-full">
+        <div className="px-4 pt-5 pb-2">
+          <div className="h-7 w-32 bg-gray-100 rounded-lg animate-pulse" />
+        </div>
+        <ul className="divide-y divide-gray-100 px-4">
+          {[1, 2, 3].map((i) => (
+            <li key={i} className="flex items-center gap-3 py-3">
+              <div className="w-16 h-16 rounded-xl bg-gray-100 shrink-0 animate-pulse" />
+              <div className="flex-1 space-y-2">
+                <div className="h-4 bg-gray-100 rounded animate-pulse w-3/4" />
+                <div className="h-3 bg-gray-100 rounded animate-pulse w-1/2" />
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
     );
   }
 
@@ -395,7 +418,7 @@ export default function Home() {
   const [tab, setTab] = useState<Tab>("extract");
 
   return (
-    <div className="flex flex-col h-screen max-w-lg mx-auto">
+    <div className="flex flex-col h-[100dvh] max-w-lg mx-auto">
       {/* Screen */}
       <div className="flex-1 overflow-hidden">
         {tab === "extract" ? <ExtractScreen /> : <RecipesScreen />}
