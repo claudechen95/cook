@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { spawn } from "child_process";
+import { probePost, spawnErrorMessage } from "@/lib/ytdlp";
 
 export async function POST(request: Request) {
   const { url } = await request.json();
@@ -8,32 +8,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid Instagram URL" }, { status: 400 });
   }
 
-  return new Promise<Response>((resolve) => {
-    let stdout = "";
-    let stderr = "";
+  try {
+    const probe = await probePost(url);
 
-    const proc = spawn("yt-dlp", ["--dump-json", "--no-download", url]);
-    proc.stdout.on("data", (d: Buffer) => (stdout += d.toString()));
-    proc.stderr.on("data", (d: Buffer) => (stderr += d.toString()));
+    if (probe.code !== 0 || probe.stdout.length === 0) {
+      return NextResponse.json(
+        { error: `Could not read post: ${probe.stderr.trim() || "no output from yt-dlp"}` },
+        { status: 422 }
+      );
+    }
 
-    proc.on("close", (code) => {
-      if (code !== 0 || !stdout) {
-        resolve(NextResponse.json({ error: `yt-dlp failed: ${stderr.trim()}` }, { status: 422 }));
-        return;
-      }
-      try {
-        const meta = JSON.parse(stdout);
-        resolve(NextResponse.json({
-          title: meta.title ?? "",
-          description: meta.description ?? "",
-        }));
-      } catch {
-        resolve(NextResponse.json({ error: "Could not parse metadata" }, { status: 500 }));
-      }
+    // Caption lives at the top level for both single posts and carousels.
+    const meta = JSON.parse(probe.stdout.toString());
+
+    return NextResponse.json({
+      title: meta.title ?? "",
+      description: meta.description ?? "",
     });
-
-    proc.on("error", (err) =>
-      resolve(NextResponse.json({ error: err.message }, { status: 500 }))
-    );
-  });
+  } catch (err) {
+    if (err instanceof SyntaxError) {
+      return NextResponse.json({ error: "Could not parse metadata" }, { status: 500 });
+    }
+    return NextResponse.json({ error: spawnErrorMessage(err) }, { status: 500 });
+  }
 }
