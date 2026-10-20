@@ -61,8 +61,14 @@ npm run deploy  # git push → Vercel
 
 The app can't run on Vercel - there's no yt-dlp binary in a serverless runtime,
 and Instagram treats datacenter IPs very differently from a home connection. It
-runs instead as a launchd service on this Mac, on **http://localhost:3100**
-(also reachable on the LAN, e.g. `http://192.168.0.132:3100`, for phone use).
+runs instead as a launchd service on this Mac:
+
+**http://claudes-macbook-air.local:3100**
+
+Use the Bonjour name, not the LAN IP - the DHCP lease is 2 hours, so the address
+changes. The app is installable to the iOS home screen (Share → Add to Home
+Screen); it has a web manifest and declares itself standalone, so it opens
+full-screen without browser chrome.
 
 ```bash
 ./scripts/serve-local.sh   # build, publish to ~/srv/cook, restart the service
