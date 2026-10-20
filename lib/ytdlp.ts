@@ -53,6 +53,31 @@ export function probePost(url: string): Promise<YtDlpResult> {
   return runYtDlp([...cookieArgs(), "--ignore-no-formats-error", "-J", "--no-warnings", url]);
 }
 
+/**
+ * yt-dlp's stderr is written for developers - it cites issue templates and CLI
+ * flags. Turn the cases a user can actually hit into something they can act on,
+ * and log the original for debugging.
+ */
+export function friendlyError(stderr: string): string {
+  console.error("[yt-dlp]", stderr.trim());
+
+  const s = stderr.toLowerCase();
+
+  if (s.includes("no video formats")) {
+    return "That post has no video - it looks like photos only.";
+  }
+  if (s.includes("empty media response") || s.includes("requested content is not available")) {
+    return "Couldn't open that post. It may be private or deleted, or the link may be wrong.";
+  }
+  if (s.includes("login required") || s.includes("rate-limit") || s.includes("429")) {
+    return "Instagram wants a login for this post - it may be private, or this machine may be temporarily rate-limited. Try again in a few minutes.";
+  }
+  if (s.includes("unsupported url")) {
+    return "That doesn't look like a link to an Instagram post.";
+  }
+  return "Could not read that post. If this keeps happening, Instagram has likely changed - running `yt-dlp -U` usually fixes it.";
+}
+
 export function spawnErrorMessage(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err);
   const hint = msg.includes("ENOENT")

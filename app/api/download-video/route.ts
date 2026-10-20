@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { cookieArgs, probePost, runYtDlp, spawnErrorMessage } from "@/lib/ytdlp";
+import { cookieArgs, friendlyError, probePost, runYtDlp, spawnErrorMessage } from "@/lib/ytdlp";
 
 // Pre-merged mp4, sorted to prefer h264/aac so the <video> element can decode it
 // in every browser. No post-processor runs, which matters because we stream to stdout.
@@ -37,10 +37,7 @@ export async function POST(request: Request) {
     const probe = await probePost(url);
 
     if (probe.code !== 0 || probe.stdout.length === 0) {
-      return NextResponse.json(
-        { error: `Could not read post: ${probe.stderr.trim() || "no output from yt-dlp"}` },
-        { status: 422 }
-      );
+      return NextResponse.json({ error: friendlyError(probe.stderr) }, { status: 422 });
     }
 
     const target = pickVideoItem(JSON.parse(probe.stdout.toString()));
@@ -67,10 +64,7 @@ export async function POST(request: Request) {
     ]);
 
     if (dl.code !== 0 || dl.stdout.length === 0) {
-      return NextResponse.json(
-        { error: `Download failed: ${dl.stderr.trim() || "no output from yt-dlp"}` },
-        { status: 422 }
-      );
+      return NextResponse.json({ error: friendlyError(dl.stderr) }, { status: 422 });
     }
 
     return new Response(dl.stdout, {

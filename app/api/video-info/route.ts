@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { probePost, spawnErrorMessage } from "@/lib/ytdlp";
+import { friendlyError, probePost, spawnErrorMessage } from "@/lib/ytdlp";
 
 export async function POST(request: Request) {
   const { url } = await request.json();
@@ -12,10 +12,7 @@ export async function POST(request: Request) {
     const probe = await probePost(url);
 
     if (probe.code !== 0 || probe.stdout.length === 0) {
-      return NextResponse.json(
-        { error: `Could not read post: ${probe.stderr.trim() || "no output from yt-dlp"}` },
-        { status: 422 }
-      );
+      return NextResponse.json({ error: friendlyError(probe.stderr) }, { status: 422 });
     }
 
     // Caption lives at the top level for both single posts and carousels.
