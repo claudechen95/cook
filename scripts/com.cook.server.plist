@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Always-on local Cook server.
+
+  Install:  cp scripts/com.cook.server.plist ~/Library/LaunchAgents/
+            launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.cook.server.plist
+  Stop:     launchctl bootout gui/$(id -u)/com.cook.server
+  Logs:     ~/Library/Logs/cook/
+
+  The node path is nvm's and therefore version-specific - update it after an
+  nvm upgrade, or the service will fail to start.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.cook.server</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/Claude/.nvm/versions/node/v24.21.0/bin/node</string>
+        <string>/Users/Claude/srv/cook/server.js</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/Claude/srv/cook</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>NODE_ENV</key>
+        <string>production</string>
+        <!-- 3100, not 3000, so `npm run dev` stays available for development. -->
+        <key>PORT</key>
+        <string>3100</string>
+        <!-- Listen on all interfaces so the phone can reach it over the LAN. -->
+        <key>HOSTNAME</key>
+        <string>0.0.0.0</string>
+        <key>PATH</key>
+        <string>/Users/Claude/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/Claude/Library/Logs/cook/server.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/Claude/Library/Logs/cook/server.err.log</string>
+</dict>
+</plist>

@@ -56,3 +56,37 @@ YT_DLP_COOKIES_BROWSER=   # e.g. "chrome:Profile 12" — note bare "chrome" mean
 npm run dev     # localhost:3000
 npm run deploy  # git push → Vercel
 ```
+
+## Always-on local service
+
+The app can't run on Vercel - there's no yt-dlp binary in a serverless runtime,
+and Instagram treats datacenter IPs very differently from a home connection. It
+runs instead as a launchd service on this Mac, on **http://localhost:3100**
+(also reachable on the LAN, e.g. `http://192.168.0.132:3100`, for phone use).
+
+```bash
+./scripts/serve-local.sh   # build, publish to ~/srv/cook, restart the service
+```
+
+| | |
+|---|---|
+| Service | `com.cook.server` (`scripts/com.cook.server.plist`) |
+| Runs from | `~/srv/cook` — a standalone build, **not** this worktree |
+| Logs | `~/Library/Logs/cook/` |
+| Stop | `launchctl bootout gui/$(id -u)/com.cook.server` |
+| Start | `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.cook.server.plist` |
+
+Why it runs from `~/srv/cook` rather than this directory:
+
+- Editing code or switching branches can't disturb the running app.
+- The repo's dev-server git guard blocks `checkout`/`pull`/`rebase` while a server
+  watches *that worktree*. Running outside it keeps git usable here. (Next renames
+  its process to `next-server` either way, so only the working directory saves us.)
+
+Port 3100 rather than 3000 keeps `npm run dev` free for development.
+
+Changes only go live after `./scripts/serve-local.sh` — the service serves a built
+copy, so editing files here changes nothing until you publish.
+
+The plist pins nvm's versioned node path; update it after an nvm upgrade or the
+service won't start.
